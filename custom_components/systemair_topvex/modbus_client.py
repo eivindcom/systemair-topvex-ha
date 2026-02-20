@@ -1,6 +1,7 @@
 """Low-level Modbus TCP client for Systemair Topvex."""
 from __future__ import annotations
 
+import inspect
 import logging
 
 from pymodbus.client import AsyncModbusTcpClient
@@ -16,6 +17,27 @@ def signed16(val: int) -> int:
     return val - 65536 if val > 32767 else val
 
 
+def _detect_unit_kwarg() -> str:
+    """Detect which keyword pymodbus uses for unit ID.
+
+    pymodbus 3.6: 'slave'
+    pymodbus 3.7+: 'slave' (deprecated) or 'device_id'
+    pymodbus 3.12+: 'device_id' only
+    """
+    sig = inspect.signature(AsyncModbusTcpClient.read_input_registers)
+    params = sig.parameters
+    if "device_id" in params:
+        return "device_id"
+    if "slave" in params:
+        return "slave"
+    if "unit" in params:
+        return "unit"
+    return "slave"
+
+
+_UNIT_KWARG = _detect_unit_kwarg()
+
+
 class TopvexModbusClient:
     """Async Modbus TCP client for Topvex Access controller."""
 
@@ -24,6 +46,10 @@ class TopvexModbusClient:
         self.port = port
         self.unit_id = unit_id
         self._client: AsyncModbusTcpClient | None = None
+
+    def _ukw(self) -> dict:
+        """Return the unit ID keyword argument for pymodbus calls."""
+        return {_UNIT_KWARG: self.unit_id}
 
     async def connect(self) -> bool:
         """Connect to the Modbus device."""
@@ -57,7 +83,7 @@ class TopvexModbusClient:
             )
         try:
             result = await self._client.read_input_registers(
-                address=address, count=count, slave=self.unit_id
+                address=address, count=count, **self._ukw()
             )
             if result.isError():
                 _LOGGER.debug(
@@ -82,7 +108,7 @@ class TopvexModbusClient:
             )
         try:
             result = await self._client.read_holding_registers(
-                address=address, count=count, slave=self.unit_id
+                address=address, count=count, **self._ukw()
             )
             if result.isError():
                 _LOGGER.debug(
@@ -103,7 +129,7 @@ class TopvexModbusClient:
             value += 65536
         try:
             result = await self._client.write_register(
-                address=address, value=value, slave=self.unit_id
+                address=address, value=value, **self._ukw()
             )
             if result.isError():
                 _LOGGER.error(
@@ -121,7 +147,7 @@ class TopvexModbusClient:
             return False
         try:
             result = await self._client.write_coil(
-                address=address, value=value, slave=self.unit_id
+                address=address, value=value, **self._ukw()
             )
             if result.isError():
                 _LOGGER.error(
