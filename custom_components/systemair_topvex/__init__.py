@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
+from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -48,6 +50,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Register Lovelace card as static resource
+    card_path = Path(__file__).parent / "systemair-topvex-card.js"
+    card_url = f"/{DOMAIN}/systemair-topvex-card.js"
+    hass.http.register_static_path(card_url, str(card_path), cache_headers=False)
+
+    # Auto-add as Lovelace resource
+    await _async_register_card_resource(hass, card_url)
+
     # Register services
     async def handle_kitchen_boost(call: ServiceCall) -> None:
         minutes = call.data.get("minutes", BOOST_DEFAULT_MINUTES)
@@ -84,3 +94,30 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.services.async_remove(DOMAIN, SERVICE_CANCEL_BOOST)
 
     return unload_ok
+
+
+async def _async_register_card_resource(hass: HomeAssistant, url: str) -> None:
+    """Register the Lovelace card as a frontend resource."""
+    try:
+        # Use the lovelace resources collection if available
+        from homeassistant.components.lovelace import (
+            ResourceStorageCollection,
+        )
+        from homeassistant.components.lovelace.const import RESOURCE_TYPE_MODULE
+
+        resources: ResourceStorageCollection | None = hass.data.get("lovelace_resources")
+        if resources is None:
+            return
+
+        # Check if already registered
+        for item in resources.async_items():
+            if item.get("url") == url:
+                return
+
+        await resources.async_create_item({"res_type": RESOURCE_TYPE_MODULE, "url": url})
+        _LOGGER.info("Registered Lovelace card resource: %s", url)
+    except Exception:
+        _LOGGER.debug(
+            "Could not auto-register Lovelace resource. "
+            "Add manually: URL=%s, Type=JavaScript Module", url
+        )
