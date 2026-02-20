@@ -21,6 +21,8 @@ async def async_setup_entry(
         TopvexSupplySetpoint(coordinator),
         TopvexFanOutputNumber(coordinator, "saf", "SAF manuell utgang"),
         TopvexFanOutputNumber(coordinator, "eaf", "EAF manuell utgang"),
+        TopvexFanSetpointNumber(coordinator, "saf", "SAF manuelt settpunkt"),
+        TopvexFanSetpointNumber(coordinator, "eaf", "EAF manuelt settpunkt"),
         TopvexBypassOutput(coordinator),
     ])
 
@@ -81,6 +83,39 @@ class TopvexFanOutputNumber(TopvexEntity, NumberEntity):
             await self.coordinator.async_set_saf_manual_output(value)
         else:
             await self.coordinator.async_set_eaf_manual_output(value)
+
+
+class TopvexFanSetpointNumber(TopvexEntity, NumberEntity):
+    """Fan manual flow setpoint (m³/h)."""
+
+    _attr_native_min_value = 100
+    _attr_native_max_value = 2000
+    _attr_native_step = 50
+    _attr_native_unit_of_measurement = "m³/h"
+    _attr_mode = NumberMode.SLIDER
+    _attr_icon = "mdi:fan"
+
+    def __init__(
+        self, coordinator: TopvexCoordinator, fan_id: str, name: str
+    ) -> None:
+        super().__init__(coordinator, f"{fan_id}_manual_setpoint", name)
+        self._fan_id = fan_id
+
+    @property
+    def native_value(self) -> float | None:
+        """Return current manual setpoint."""
+        if self.coordinator.data is None:
+            return None
+        if self._fan_id == "saf":
+            return self.coordinator.data.saf_manual_setpoint
+        return self.coordinator.data.eaf_manual_setpoint
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set manual flow setpoint."""
+        if self._fan_id == "saf":
+            await self.coordinator.async_set_saf_manual_setpoint(value)
+        else:
+            await self.coordinator.async_set_eaf_manual_setpoint(value)
 
 
 class TopvexBypassOutput(TopvexEntity, NumberEntity):
