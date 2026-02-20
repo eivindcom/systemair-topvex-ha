@@ -1,0 +1,12 @@
+{
+  "domain": "systemair_topvex",
+  "name": "Systemair Topvex Ventilation",
+  "version": "1.0.0",
+  "codeowners": ["@eivindcom"],
+  "config_flow": true,
+  "documentation": "https://github.com/eivindcom/systemair-topvex-ha",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "requirements": ["pymodbus>=3.6.0"],
+  "issue_tracker": "https://github.com/eivindcom/systemair-topvex-ha/issues"
+}

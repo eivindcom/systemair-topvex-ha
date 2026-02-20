@@ -1,0 +1,19 @@
+kitchen_boost:
+  name: Start komfyravtrekk
+  description: "Start kitchen boost mode (SAF=1400 m³/h, EAF=400 m³/h) with timer."
+  fields:
+    minutes:
+      name: Minutes
+      description: "Duration in minutes"
+      required: false
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: min
+
+cancel_kitchen_boost:
+  name: Avbryt komfyravtrekk
+  description: "Cancel active kitchen boost and restore previous settings."

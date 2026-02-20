@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Systemair Topvex",
+        "description": "Sett opp Topvex ventilasjonsaggregat via Modbus TCP.",
+        "data": {
+          "host": "IP-adresse",
+          "port": "Modbus TCP-port",
+          "unit_id": "Modbus enhet-ID",
+          "scan_interval": "Oppdateringsintervall (sekunder)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan ikke koble til Topvex. Sjekk IP og port.",
+      "cannot_read": "Tilkoblet, men kan ikke lese registre. Sjekk enhet-ID."
+    }
+  }
+}

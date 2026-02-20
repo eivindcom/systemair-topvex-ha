@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Systemair Topvex",
+        "description": "Set up your Topvex ventilation unit via Modbus TCP.",
+        "data": {
+          "host": "IP address",
+          "port": "Modbus TCP port",
+          "unit_id": "Modbus unit ID",
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to Topvex. Check IP and port.",
+      "cannot_read": "Connected but cannot read registers. Check unit ID."
+    }
+  }
+}
