@@ -53,9 +53,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     card_path = Path(__file__).parent / "systemair-topvex-card.js"
     card_url = f"/{DOMAIN}/systemair-topvex-card.js"
     try:
-        hass.http.register_static_path(card_url, str(card_path), cache_headers=False)
+        from homeassistant.components.http import StaticPathConfig
+        await hass.http.async_register_static_paths([
+            StaticPathConfig(card_url, str(card_path), False)
+        ])
     except Exception:
-        _LOGGER.debug("Static path %s already registered", card_url)
+        _LOGGER.debug("Could not register static path %s", card_url)
 
     # Auto-add as Lovelace resource
     await _async_register_card_resource(hass, card_url)
