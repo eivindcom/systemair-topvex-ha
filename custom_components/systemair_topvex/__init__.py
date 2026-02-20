@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from homeassistant.components.frontend import async_register_built_in_panel
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -53,7 +52,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register Lovelace card as static resource
     card_path = Path(__file__).parent / "systemair-topvex-card.js"
     card_url = f"/{DOMAIN}/systemair-topvex-card.js"
-    hass.http.register_static_path(card_url, str(card_path), cache_headers=False)
+    try:
+        hass.http.register_static_path(card_url, str(card_path), cache_headers=False)
+    except Exception:
+        _LOGGER.debug("Static path %s already registered", card_url)
 
     # Auto-add as Lovelace resource
     await _async_register_card_resource(hass, card_url)
