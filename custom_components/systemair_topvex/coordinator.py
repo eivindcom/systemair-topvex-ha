@@ -165,6 +165,10 @@ class TopvexCoordinator(DataUpdateCoordinator[TopvexData]):
             elif self.data:
                 data.alarms = self.data.alarms
 
+            # Refine unit_mode_name when in manual mode
+            if data.unit_mode == 0 and data.ahu_mode == 1:
+                data.unit_mode_name = "Manuell"
+
             self._poll_cycle += 1
 
             # Boost state
