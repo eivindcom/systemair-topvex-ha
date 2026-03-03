@@ -85,7 +85,12 @@ class TopvexClimate(TopvexEntity, ClimateEntity):
         """Return current preset mode."""
         if self.coordinator.data is None:
             return None
-        return AHU_MODE_TO_PRESET.get(self.coordinator.data.ahu_mode)
+        ahu = self.coordinator.data.ahu_mode
+        if ahu == 1:
+            # Manual AHU mode — map submode to nearest preset so UI stays interactive
+            submode_map = {2: PRESET_LOW, 3: PRESET_NORMAL, 4: PRESET_HIGH}
+            return submode_map.get(self.coordinator.data.manual_submode, PRESET_NORMAL)
+        return AHU_MODE_TO_PRESET.get(ahu)
 
     @property
     def extra_state_attributes(self) -> dict:
