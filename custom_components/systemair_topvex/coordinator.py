@@ -108,6 +108,14 @@ class TopvexData:
     eaf_flow_normal: float | None = None
     eaf_flow_high: float | None = None
 
+    # Fan output setpoints (%)
+    saf_output_low: float | None = None
+    saf_output_normal: float | None = None
+    saf_output_high: float | None = None
+    eaf_output_low: float | None = None
+    eaf_output_normal: float | None = None
+    eaf_output_high: float | None = None
+
     # Bypass
     bypass_mode: int | None = None
     bypass_manual_output: float | None = None
@@ -279,6 +287,12 @@ class TopvexCoordinator(DataUpdateCoordinator[TopvexData]):
             data.eaf_flow_low = signed16(hr3[3]) / 10
             data.eaf_flow_normal = signed16(hr3[4]) / 10
             data.eaf_flow_high = signed16(hr3[5]) / 10
+            data.saf_output_low = signed16(hr3[6]) / 10
+            data.saf_output_normal = signed16(hr3[7]) / 10
+            data.saf_output_high = signed16(hr3[8]) / 10
+            data.eaf_output_low = signed16(hr3[9]) / 10
+            data.eaf_output_normal = signed16(hr3[10]) / 10
+            data.eaf_output_high = signed16(hr3[11]) / 10
 
         # HR 719-720 (bypass control)
         hr4 = await self.client.read_holding_registers(719, 2)
@@ -340,53 +354,21 @@ class TopvexCoordinator(DataUpdateCoordinator[TopvexData]):
         await self.client.write_register(HR.EAF_MODE, mode)
         await self.async_request_refresh()
 
-    async def async_set_saf_manual_output(self, pct: float) -> None:
-        """Set SAF manual output % (min 25). Auto-sets AHU=Manual+Normal, SAF=Man.utgang."""
-        pct = max(25, min(100, pct))
-        if not self.data or self.data.ahu_mode != 1:
-            await self.client.write_register(HR.AHU_MODE, 1)
-        if not self.data or self.data.manual_submode not in (2, 3, 4):
-            await self.client.write_register(HR.MANUAL_SUBMODE, 3)
-        if not self.data or self.data.saf_mode != 1:
-            await self.client.write_register(HR.SAF_MODE, 1)
-        await self.client.write_register(HR.SAF_MANUAL_OUTPUT, round(pct * 10))
-        await self.async_request_refresh()
-
-    async def async_set_eaf_manual_output(self, pct: float) -> None:
-        """Set EAF manual output % (min 25). Auto-sets AHU=Manual+Normal, EAF=Man.utgang."""
-        pct = max(25, min(100, pct))
-        if not self.data or self.data.ahu_mode != 1:
-            await self.client.write_register(HR.AHU_MODE, 1)
-        if not self.data or self.data.manual_submode not in (2, 3, 4):
-            await self.client.write_register(HR.MANUAL_SUBMODE, 3)
-        if not self.data or self.data.eaf_mode != 1:
-            await self.client.write_register(HR.EAF_MODE, 1)
-        await self.client.write_register(HR.EAF_MANUAL_OUTPUT, round(pct * 10))
-        await self.async_request_refresh()
-
-    async def async_set_saf_manual_setpoint(self, flow: float) -> None:
-        """Set SAF manual flow setpoint (m³/h). Auto-sets AHU=Manual+Normal, SAF=Man.SP."""
-        flow = max(100, min(2000, flow))
-        if not self.data or self.data.ahu_mode != 1:
-            await self.client.write_register(HR.AHU_MODE, 1)
-        if not self.data or self.data.manual_submode not in (2, 3, 4):
-            await self.client.write_register(HR.MANUAL_SUBMODE, 3)
-        if not self.data or self.data.saf_mode != 3:
-            await self.client.write_register(HR.SAF_MODE, 3)
-        await self.client.write_register(HR.SAF_MANUAL_SETPOINT, round(flow * 10))
-        await self.async_request_refresh()
-
-    async def async_set_eaf_manual_setpoint(self, flow: float) -> None:
-        """Set EAF manual flow setpoint (m³/h). Auto-sets AHU=Manual+Normal, EAF=Man.SP."""
-        flow = max(100, min(2000, flow))
-        if not self.data or self.data.ahu_mode != 1:
-            await self.client.write_register(HR.AHU_MODE, 1)
-        if not self.data or self.data.manual_submode not in (2, 3, 4):
-            await self.client.write_register(HR.MANUAL_SUBMODE, 3)
-        if not self.data or self.data.eaf_mode != 3:
-            await self.client.write_register(HR.EAF_MODE, 3)
-        await self.client.write_register(HR.EAF_MANUAL_SETPOINT, round(flow * 10))
-        await self.async_request_refresh()
+    async def async_set_level_flow(self, fan_id: str, level: str, flow: float) -> None:
+        """Set flow setpoint (m³/h) for a speed level. Does NOT change AHU mode."""
+        regs = {
+            ("saf", "low"): HR.SAF_FLOW_LOW,
+            ("saf", "normal"): HR.SAF_FLOW_NORMAL,
+            ("saf", "high"): HR.SAF_FLOW_HIGH,
+            ("eaf", "low"): HR.EAF_FLOW_LOW,
+            ("eaf", "normal"): HR.EAF_FLOW_NORMAL,
+            ("eaf", "high"): HR.EAF_FLOW_HIGH,
+        }
+        reg = regs.get((fan_id, level))
+        if reg is not None:
+            flow = max(50, min(2000, flow))
+            await self.client.write_register(reg, round(flow * 10))
+            await self.async_request_refresh()
 
     async def async_set_bypass_mode(self, mode: int) -> None:
         """Set bypass mode (0=Auto, 1=Manual)."""

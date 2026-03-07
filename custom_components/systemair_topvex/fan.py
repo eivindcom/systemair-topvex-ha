@@ -6,9 +6,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, FAN_MODES
+from .const import DOMAIN
 from .coordinator import TopvexCoordinator
 from .entity import TopvexEntity
+
+SAFE_PRESETS = ["Auto", "Lav", "Normal", "Høy"]
+PRESET_TO_AHU = {"Auto": 2, "Lav": 3, "Normal": 4, "Høy": 5}
 
 
 async def async_setup_entry(
@@ -23,13 +26,11 @@ async def async_setup_entry(
 
 
 class TopvexFan(TopvexEntity, FanEntity):
-    """Supply or extract air fan."""
+    """Supply or extract air fan (read-only speed, mode via presets)."""
 
-    _attr_supported_features = (
-        FanEntityFeature.SET_SPEED | FanEntityFeature.PRESET_MODE
-    )
+    _attr_supported_features = FanEntityFeature.PRESET_MODE
     _attr_speed_count = 100
-    _attr_preset_modes = list(FAN_MODES.values())
+    _attr_preset_modes = SAFE_PRESETS
 
     def __init__(
         self, coordinator: TopvexCoordinator, fan_id: str, name: str
@@ -40,7 +41,6 @@ class TopvexFan(TopvexEntity, FanEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return True if fan is on."""
         if self.coordinator.data is None:
             return None
         output = self._get_output()
@@ -48,7 +48,7 @@ class TopvexFan(TopvexEntity, FanEntity):
 
     @property
     def percentage(self) -> int | None:
-        """Return fan speed percentage."""
+        """Return current fan output % (read-only)."""
         output = self._get_output()
         if output is None:
             return None
@@ -56,15 +56,15 @@ class TopvexFan(TopvexEntity, FanEntity):
 
     @property
     def preset_mode(self) -> str | None:
-        """Return current fan mode."""
+        """Return current AHU mode as preset."""
         if self.coordinator.data is None:
             return None
-        mode = self._get_mode()
-        return FAN_MODES.get(mode)
+        ahu = self.coordinator.data.ahu_mode
+        ahu_to_preset = {2: "Auto", 3: "Lav", 4: "Normal", 5: "Høy"}
+        return ahu_to_preset.get(ahu)
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Return extra attributes."""
         if self.coordinator.data is None:
             return {}
         d = self.coordinator.data
@@ -72,59 +72,32 @@ class TopvexFan(TopvexEntity, FanEntity):
             return {
                 "flow": d.saf_flow,
                 "mode_raw": d.saf_mode,
-                "manual_setpoint": d.saf_manual_setpoint,
-                "manual_output": d.saf_manual_output,
+                "flow_low": d.saf_flow_low,
+                "flow_normal": d.saf_flow_normal,
+                "flow_high": d.saf_flow_high,
             }
         return {
             "flow": d.eaf_flow,
             "mode_raw": d.eaf_mode,
-            "manual_setpoint": d.eaf_manual_setpoint,
-            "manual_output": d.eaf_manual_output,
+            "flow_low": d.eaf_flow_low,
+            "flow_normal": d.eaf_flow_normal,
+            "flow_high": d.eaf_flow_high,
         }
 
-    async def async_set_percentage(self, percentage: int) -> None:
-        """Set fan speed percentage (min 25%)."""
-        pct = max(25, min(100, percentage))
-        if self._fan_id == "saf":
-            await self.coordinator.async_set_saf_mode(1)  # Manual output
-            await self.coordinator.async_set_saf_manual_output(pct)
-        else:
-            await self.coordinator.async_set_eaf_mode(1)
-            await self.coordinator.async_set_eaf_manual_output(pct)
-
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """Set fan preset mode."""
-        mode_val = None
-        for k, v in FAN_MODES.items():
-            if v == preset_mode:
-                mode_val = k
-                break
-        if mode_val is None:
-            return
-        if self._fan_id == "saf":
-            await self.coordinator.async_set_saf_mode(mode_val)
-        else:
-            await self.coordinator.async_set_eaf_mode(mode_val)
+        """Set AHU mode (safe presets only)."""
+        ahu_mode = PRESET_TO_AHU.get(preset_mode)
+        if ahu_mode is not None:
+            await self.coordinator.async_set_ahu_mode(ahu_mode)
 
     async def async_turn_on(self, percentage=None, preset_mode=None, **kwargs) -> None:
-        """Turn fan on."""
         if preset_mode:
             await self.async_set_preset_mode(preset_mode)
-        elif percentage:
-            await self.async_set_percentage(percentage)
         else:
-            # Default to Auto
-            if self._fan_id == "saf":
-                await self.coordinator.async_set_saf_mode(2)
-            else:
-                await self.coordinator.async_set_eaf_mode(2)
+            await self.coordinator.async_set_ahu_mode(2)  # Auto
 
     async def async_turn_off(self, **kwargs) -> None:
-        """Turn fan off."""
-        if self._fan_id == "saf":
-            await self.coordinator.async_set_saf_mode(0)
-        else:
-            await self.coordinator.async_set_eaf_mode(0)
+        await self.coordinator.async_set_ahu_mode(0)
 
     def _get_output(self) -> float | None:
         if self.coordinator.data is None:
@@ -132,10 +105,3 @@ class TopvexFan(TopvexEntity, FanEntity):
         if self._fan_id == "saf":
             return self.coordinator.data.saf_output
         return self.coordinator.data.eaf_output
-
-    def _get_mode(self) -> int | None:
-        if self.coordinator.data is None:
-            return None
-        if self._fan_id == "saf":
-            return self.coordinator.data.saf_mode
-        return self.coordinator.data.eaf_mode
