@@ -394,28 +394,31 @@ class TopvexCoordinator(DataUpdateCoordinator[TopvexData]):
     # --- Kitchen boost ---
 
     async def async_start_kitchen_boost(self, minutes: int) -> None:
-        """Start kitchen boost mode."""
+        """Start kitchen boost: switch to Høy mode with high SAF, low EAF.
+
+        Uses level setpoints instead of manual mode so the controller
+        keeps regulating temperature, frost protection etc.
+        """
         import time
 
         if self._boost_active and self._boost_cancel:
             self._boost_cancel()
             self._boost_cancel = None
-        elif not self._boost_active and self.data:
+
+        # Save current Høy setpoints so we can restore them
+        if not self._boost_active and self.data:
             self._boost_saved = {
-                "saf_mode": self.data.saf_mode,
-                "eaf_mode": self.data.eaf_mode,
-                "saf_manual_setpoint": self.data.saf_manual_setpoint,
-                "eaf_manual_setpoint": self.data.eaf_manual_setpoint,
+                "saf_flow_high": self.data.saf_flow_high,
+                "eaf_flow_high": self.data.eaf_flow_high,
+                "ahu_mode": self.data.ahu_mode,
             }
 
-        await self.client.write_register(HR.SAF_MODE, 3)
-        await self.client.write_register(HR.EAF_MODE, 3)
-        await self.client.write_register(
-            HR.SAF_MANUAL_SETPOINT, round(BOOST_SAF_FLOW * 10)
-        )
-        await self.client.write_register(
-            HR.EAF_MANUAL_SETPOINT, round(BOOST_EAF_FLOW * 10)
-        )
+        # Set Høy level flows for kitchen boost
+        await self.client.write_register(HR.SAF_FLOW_HIGH, round(BOOST_SAF_FLOW * 10))
+        await self.client.write_register(HR.EAF_FLOW_HIGH, round(BOOST_EAF_FLOW * 10))
+
+        # Switch to Høy mode (SAF/EAF stay in Auto)
+        await self.async_set_ahu_mode(5)
 
         self._boost_active = True
         self._boost_ends_at = time.time() + minutes * 60
@@ -424,7 +427,7 @@ class TopvexCoordinator(DataUpdateCoordinator[TopvexData]):
             self.hass, minutes * 60, self._async_boost_expired
         )
 
-        _LOGGER.info("Kitchen boost started: %d minutes", minutes)
+        _LOGGER.info("Kitchen boost started: %d minutes (Høy mode)", minutes)
         await self.async_request_refresh()
 
     async def _async_boost_expired(self, _now=None) -> None:
@@ -439,28 +442,28 @@ class TopvexCoordinator(DataUpdateCoordinator[TopvexData]):
         await self._async_restore_from_boost()
 
     async def _async_restore_from_boost(self) -> None:
-        """Restore saved fan settings."""
+        """Restore Høy setpoints and switch back to Normal."""
         if self._boost_saved:
             saved = self._boost_saved
             try:
-                await self.client.write_register(HR.SAF_MODE, saved["saf_mode"])
-                await self.client.write_register(HR.EAF_MODE, saved["eaf_mode"])
-                if saved["saf_mode"] == 3 and saved["saf_manual_setpoint"] is not None:
+                # Restore original Høy flow setpoints
+                if saved["saf_flow_high"] is not None:
                     await self.client.write_register(
-                        HR.SAF_MANUAL_SETPOINT,
-                        round(saved["saf_manual_setpoint"] * 10),
+                        HR.SAF_FLOW_HIGH, round(saved["saf_flow_high"] * 10)
                     )
-                if saved["eaf_mode"] == 3 and saved["eaf_manual_setpoint"] is not None:
+                if saved["eaf_flow_high"] is not None:
                     await self.client.write_register(
-                        HR.EAF_MANUAL_SETPOINT,
-                        round(saved["eaf_manual_setpoint"] * 10),
+                        HR.EAF_FLOW_HIGH, round(saved["eaf_flow_high"] * 10)
                     )
             except Exception:
-                _LOGGER.exception("Error restoring from kitchen boost")
+                _LOGGER.exception("Error restoring Høy setpoints from kitchen boost")
+
+        # Always return to Normal mode
+        await self.async_set_ahu_mode(4)
 
         self._boost_active = False
         self._boost_ends_at = 0
         self._boost_saved = None
         self._boost_cancel = None
-        _LOGGER.info("Kitchen boost ended, settings restored")
+        _LOGGER.info("Kitchen boost ended, back to Normal mode")
         await self.async_request_refresh()

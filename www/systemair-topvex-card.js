@@ -139,11 +139,8 @@ class SystemairTopvexCard extends HTMLElement {
         .temp-btn:hover { background: rgba(126,200,227,0.15); }
         .temp-val { color: #fff; font-size: 20px; font-weight: 600; font-family: sans-serif; min-width: 70px; text-align: center; }
 
-        .flow-grid {
-          display: grid; grid-template-columns: 80px 1fr 1fr 1fr; gap: 4px 8px; align-items: center;
-        }
-        .flow-hdr { color: rgba(255,255,255,0.4); font-size: 11px; font-family: sans-serif; text-align: center; }
-        .flow-lbl { color: rgba(255,255,255,0.6); font-size: 12px; font-family: sans-serif; }
+        .flow-row { display: flex; align-items: center; gap: 8px; }
+        .flow-lbl { color: rgba(255,255,255,0.6); font-size: 12px; font-family: sans-serif; min-width: 50px; }
         .flow-input {
           width: 100%; padding: 5px 4px; border: 1px solid rgba(126,200,227,0.2); border-radius: 5px;
           background: rgba(0,0,0,0.3); color: #7ec8e3; font-size: 13px; font-family: sans-serif;
@@ -250,31 +247,27 @@ class SystemairTopvexCard extends HTMLElement {
             </div>
 
             <div class="ctrl-section">
-              <div class="ctrl-label">Luftmengder (m\u00b3/h)</div>
-              <div class="flow-grid">
-                <div class="flow-hdr"></div>
-                <div class="flow-hdr">Lav</div>
-                <div class="flow-hdr">Normal</div>
-                <div class="flow-hdr">H\u00f8y</div>
-                <div class="flow-lbl">Tilluft</div>
-                <input type="number" class="flow-input" data-entity="number.${dev}_saf_flow_lav" value="${safFlowLow ?? ''}" step="10">
+              <div class="ctrl-label">Normal luftmengder (m\u00b3/h)</div>
+              <div class="flow-row">
+                <span class="flow-lbl">Tilluft</span>
                 <input type="number" class="flow-input" data-entity="number.${dev}_saf_flow_normal" value="${safFlowNormal ?? ''}" step="10">
-                <input type="number" class="flow-input" data-entity="number.${dev}_saf_flow_hoy" value="${safFlowHigh ?? ''}" step="10">
-                <div class="flow-lbl">Avtrekk</div>
-                <input type="number" class="flow-input" data-entity="number.${dev}_eaf_flow_lav" value="${eafFlowLow ?? ''}" step="10">
+                <span class="flow-lbl">Avtrekk</span>
                 <input type="number" class="flow-input" data-entity="number.${dev}_eaf_flow_normal" value="${eafFlowNormal ?? ''}" step="10">
-                <input type="number" class="flow-input" data-entity="number.${dev}_eaf_flow_hoy" value="${eafFlowHigh ?? ''}" step="10">
               </div>
             </div>
 
             <div class="ctrl-section">
               <div class="ctrl-label">Komfyravtrekk</div>
-              ${boostRemaining > 0 ? `<div class="boost-active">Aktiv \u2014 ${Math.ceil(boostRemaining / 60)} min igjen</div>` : ''}
+              ${boostRemaining > 0
+                ? `<div class="boost-active">Aktiv \u2014 ${Math.ceil(boostRemaining / 60)} min igjen</div>`
+                : ''}
               <div class="boost-row">
                 <button class="boost-btn" data-minutes="10">10 min</button>
                 <button class="boost-btn" data-minutes="20">20 min</button>
                 <button class="boost-btn" data-minutes="30">30 min</button>
-                <button class="boost-btn cancel" data-action="cancel">Avbryt</button>
+                ${boostRemaining > 0
+                  ? `<button class="boost-btn cancel" data-action="cancel">Avbryt</button>`
+                  : ''}
               </div>
             </div>
           </div>
